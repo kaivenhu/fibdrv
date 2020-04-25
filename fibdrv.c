@@ -6,6 +6,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/uaccess.h>
+
+#include "bignum.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -17,23 +20,31 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 100
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+static inline void add_bignum(BigNum x, BigNum y, BigNum *output)
+{
+    output->upper = x.upper + y.upper;
+    if (y.lower > ~x.lower) {
+        ++output->upper;
+    }
+    output->lower = x.lower + y.lower;
+}
+
+static BigNum fib_sequence(unsigned long long k)
 {
     /* FIXME: use clz/ctz and fast algorithms to speed up */
-    long long f[k + 2];
+    BigNum f[MAX_LENGTH + 2] = {{.lower = 0, .upper = 0}};
 
-    f[0] = 0;
-    f[1] = 1;
+    f[1].lower = 1;
 
     for (int i = 2; i <= k; i++) {
-        f[i] = f[i - 1] + f[i - 2];
+        add_bignum(f[i - 1], f[i - 2], f + i);
     }
 
     return f[k];
@@ -60,7 +71,12 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    BigNum result = fib_sequence(*offset);
+    if (!copy_to_user(buf, &result, sizeof(result))) {
+        return sizeof(result);
+    } else {
+        return 0;
+    }
 }
 
 /* write operation is skipped */
