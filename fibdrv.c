@@ -4,9 +4,13 @@
 #include <linux/init.h>
 #include <linux/kdev_t.h>
 #include <linux/kernel.h>
+#include <linux/kobject.h>
+#include <linux/ktime.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/sysfs.h>
 #include <linux/uaccess.h>
+
 
 #include "bignum.h"
 
@@ -26,6 +30,40 @@ static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
+
+static ktime_t fib_cal_kt;
+static ktime_t kernel_user_kt;
+
+
+static ssize_t fib_cal_time_show(struct kobject *kobj,
+                                 struct kobj_attribute *attr,
+                                 char *buf)
+{
+    return snprintf(buf, PAGE_SIZE, "%llu\n", ktime_to_ns(fib_cal_kt));
+}
+static struct kobj_attribute fib_cal_time_attribute =
+    __ATTR(fib_cal_time, 0444, fib_cal_time_show, NULL);
+
+static ssize_t kernel_to_user_time_show(struct kobject *kobj,
+                                        struct kobj_attribute *attr,
+                                        char *buf)
+{
+    return snprintf(buf, PAGE_SIZE, "%llu\n", ktime_to_ns(kernel_user_kt));
+}
+static struct kobj_attribute kernel_to_user_time_attribute =
+    __ATTR(kernel_to_user_time, 0444, kernel_to_user_time_show, NULL);
+
+
+static struct attribute *attrs[] = {
+    &fib_cal_time_attribute.attr,
+    &kernel_to_user_time_attribute.attr,
+    NULL,
+};
+static struct attribute_group attr_group = {
+    .attrs = attrs,
+};
+
+static struct kobject *fibdrv_kobj;
 
 static inline void add_bignum(BigNum x, BigNum y, BigNum *output)
 {
@@ -71,8 +109,18 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    BigNum result = fib_sequence(*offset);
-    if (!copy_to_user(buf, &result, sizeof(result))) {
+    ktime_t prev_kt;
+    unsigned long ret;
+    BigNum result;
+
+    prev_kt = ktime_get();
+    result = fib_sequence(*offset);
+    fib_cal_kt = ktime_sub(ktime_get(), prev_kt);
+
+    prev_kt = ktime_get();
+    ret = copy_to_user(buf, &result, sizeof(result));
+    kernel_user_kt = ktime_sub(ktime_get(), prev_kt);
+    if (!ret) {
         return sizeof(result);
     } else {
         return 0;
@@ -165,7 +213,21 @@ static int __init init_fib_dev(void)
         rc = -4;
         goto failed_device_create;
     }
+
+    fibdrv_kobj = kobject_create_and_add("fibdrv", kernel_kobj);
+    if (!fibdrv_kobj) {
+        rc = -5;
+        goto failed_kobj_create;
+    }
+    /* Create the files associated with this kobject */
+    if (sysfs_create_group(fibdrv_kobj, &attr_group)) {
+        rc = -6;
+        goto failed_kobj_create;
+    }
+
     return rc;
+failed_kobj_create:
+    kobject_put(fibdrv_kobj);
 failed_device_create:
     class_destroy(fib_class);
 failed_class_create:
@@ -177,6 +239,7 @@ failed_cdev:
 
 static void __exit exit_fib_dev(void)
 {
+    kobject_put(fibdrv_kobj);
     mutex_destroy(&fib_mutex);
     device_destroy(fib_class, fib_dev);
     class_destroy(fib_class);

@@ -9,6 +9,10 @@ PWD := $(shell pwd)
 
 GIT_HOOKS := .git/hooks/applied
 
+CSRC = utime.c
+COBJ = $(CSRC:.c=.o)
+CFLAGS += -std=gnu11 -g
+
 all: $(GIT_HOOKS) client
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
@@ -24,8 +28,11 @@ load:
 unload:
 	sudo rmmod $(TARGET_MODULE) || true >/dev/null
 
-client: client.c
-	$(CC) -o $@ $^
+client: client.c $(COBJ)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(COBJ): %.o:%.c
+	$(CC) $(CFLAGS) -c -o $@ $^
 
 PRINTF = env printf
 PASS_COLOR = \e[32;01m
