@@ -12,6 +12,7 @@ GIT_HOOKS := .git/hooks/applied
 CSRC = utime.c
 COBJ = $(CSRC:.c=.o)
 CFLAGS += -std=gnu11 -g
+LDFLAGS += -lm
 
 all: $(GIT_HOOKS) client
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
@@ -22,14 +23,14 @@ $(GIT_HOOKS):
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	$(RM) client out
+	$(RM) client out result.dat result.png
 load:
 	sudo insmod $(TARGET_MODULE).ko
 unload:
 	sudo rmmod $(TARGET_MODULE) || true >/dev/null
 
 client: client.c $(COBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(COBJ): %.o:%.c
 	$(CC) $(CFLAGS) -c -o $@ $^
@@ -45,3 +46,10 @@ check: all
 	sudo ./client check > out
 	$(MAKE) unload
 	@scripts/verify.py && $(call pass)
+
+benchmark: all
+	$(MAKE) unload
+	$(MAKE) load
+	@scripts/performance.sh
+	$(MAKE) unload
+	@gnuplot scripts/plot.gp
