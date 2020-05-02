@@ -28,6 +28,8 @@ static DEFINE_MUTEX(fib_mutex);
 static ktime_t fib_cal_kt;
 static ktime_t kernel_user_kt;
 
+f_uint (*fib_op)(uint32_t) = NULL;
+
 static ssize_t fib_cal_time_show(struct kobject *kobj,
                                  struct kobj_attribute *attr,
                                  char *buf)
@@ -58,9 +60,8 @@ static struct attribute_group attr_group = {
 
 static struct kobject *fibdrv_kobj;
 
-static f_uint fib_sequence(unsigned long long k)
+static f_uint fib_sequence(uint32_t k)
 {
-    /* FIXME: use clz/ctz and fast algorithms to speed up */
     f_uint f[MAX_LENGTH + 2] = {0};
 
     f[1] = 1;
@@ -70,6 +71,27 @@ static f_uint fib_sequence(unsigned long long k)
     }
 
     return f[k];
+}
+
+static f_uint fib_fast_double(uint32_t k)
+{
+    if (unlikely(!k))
+        return 0;
+    f_uint f_n = 1;
+    f_uint f_n1 = 1;
+    for (int i = (30 - __builtin_clz(k)); i >= 0; --i) {
+        f_uint x = f_n * (2 * f_n1 - f_n);
+        f_uint y = f_n * f_n + f_n1 * f_n1;
+
+        if (k & (1 << i)) {
+            f_n = y;
+            f_n1 = x + y;
+        } else {
+            f_n = x;
+            f_n1 = y;
+        }
+    }
+    return f_n;
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -98,7 +120,7 @@ static ssize_t fib_read(struct file *file,
     f_uint result;
 
     prev_kt = ktime_get();
-    result = fib_sequence(*offset);
+    result = (*fib_op)(*offset);
     fib_cal_kt = ktime_sub(ktime_get(), prev_kt);
 
     prev_kt = ktime_get();
@@ -117,6 +139,14 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
+    char kbuf[32];
+    copy_from_user(kbuf, buf, sizeof(kbuf));
+    kbuf[sizeof(kbuf) - 1] = '\0';
+    if (0 == strcmp(kbuf, OPT_FIB_NAIVE)) {
+        fib_op = fib_sequence;
+    } else if (0 == strcmp(kbuf, OPT_FIB_FAST_DOUBLE)) {
+        fib_op = fib_fast_double;
+    }
     return 1;
 }
 
@@ -208,6 +238,8 @@ static int __init init_fib_dev(void)
         rc = -6;
         goto failed_kobj_create;
     }
+
+    fib_op = fib_fast_double;
 
     return rc;
 failed_kobj_create:

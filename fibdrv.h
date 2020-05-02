@@ -15,5 +15,7 @@ typedef unsigned long long f_uint;
 #define MAX_LENGTH 92
 #endif /* __SIZEOF_INT128__ */
 
+#define OPT_FIB_NAIVE "naive"
+#define OPT_FIB_FAST_DOUBLE "fast_double"
 
 #endif /* FIBDRV_FIBDRV_H_ */

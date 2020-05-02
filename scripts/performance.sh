@@ -10,7 +10,7 @@ sudo sh -c "echo performance > /sys/devices/system/cpu/cpu$CPUID/cpufreq/scaling
 sudo sh -c "echo 0 > /proc/sys/kernel/randomize_va_space"
 
 
-sudo taskset 0x1 ./client benchmark 10000 > /dev/null
+sudo taskset 0x1 ./client fast_doubling benchmark 10000 > /dev/null
 
 sudo sh -c "echo $ORIG_NTURBO > /sys/devices/system/cpu/intel_pstate/no_turbo"
 sudo sh -c "echo $ORIG_SCL > /sys/devices/system/cpu/cpu$CPUID/cpufreq/scaling_governor"

@@ -43,9 +43,11 @@ pass = $(PRINTF) "$(PASS_COLOR)$1 Passed [-]$(NO_COLOR)\n"
 check: all
 	$(MAKE) unload
 	$(MAKE) load
-	sudo ./client check > out
-	$(MAKE) unload
+	sudo ./client naive check > out
 	@scripts/verify.py && $(call pass)
+	sudo ./client fast_double check > out
+	@scripts/verify.py && $(call pass)
+	$(MAKE) unload
 
 benchmark: all
 	$(MAKE) unload

@@ -144,11 +144,9 @@ static void benchmark(const int fd, unsigned int runtime)
 
 int main(int argc, char *argv[])
 {
-    char write_buf[] = "testing writing";
-    int offset = 100; /* TODO: try test something bigger than the limit */
-
-    if (2 > argc && NULL == argv[1]) {
-        printf("Usage: %s [%s|%s]\n", argv[0], OPTION_CHECK, OPTION_BECHMARK);
+    if (3 > argc || NULL == argv[1] || NULL == argv[2]) {
+        printf("Usage: %s [%s|%s] [%s|%s]\n", argv[0], OPT_FIB_NAIVE,
+               OPT_FIB_FAST_DOUBLE, OPTION_CHECK, OPTION_BECHMARK);
         exit(1);
     }
 
@@ -158,22 +156,18 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    for (int i = 0; i <= offset; i++) {
-        long long sz;
-        sz = write(fd, write_buf, strlen(write_buf));
-        printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
-    }
+    write(fd, argv[1], strlen(argv[1]));
 
-    if (0 == strcmp(argv[1], OPTION_CHECK)) {
+    if (0 == strcmp(argv[2], OPTION_CHECK)) {
         check(fd);
-    } else if (0 == strcmp(argv[1], OPTION_BECHMARK)) {
-        if (3 > argc && NULL == argv[2]) {
+    } else if (0 == strcmp(argv[2], OPTION_BECHMARK)) {
+        if (3 > argc && NULL == argv[3]) {
             printf("Usage: %s " OPTION_BECHMARK " <runtime>", argv[0]);
             exit(1);
         }
-        benchmark(fd, atoi(argv[2]));
+        benchmark(fd, atoi(argv[3]));
     } else {
-        printf("Invalid option: %s\n", argv[1]);
+        printf("Invalid option: %s\n", argv[2]);
         exit(1);
     }
 
