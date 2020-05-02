@@ -2,7 +2,7 @@ CONFIG_MODULE_SIG = n
 TARGET_MODULE := fibdrv
 
 obj-m := $(TARGET_MODULE).o
-ccflags-y := -std=gnu11 -Wno-declaration-after-statement
+ccflags-y := -std=gnu11 -Wno-declaration-after-statement -DF_LARGE_NUMBER
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
@@ -11,7 +11,7 @@ GIT_HOOKS := .git/hooks/applied
 
 CSRC = utime.c
 COBJ = $(CSRC:.c=.o)
-CFLAGS += -std=gnu11 -g
+CFLAGS += -std=gnu11 -g -DF_LARGE_NUMBER
 LDFLAGS += -lm
 
 all: $(GIT_HOOKS) client

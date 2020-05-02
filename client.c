@@ -1,25 +1,27 @@
 #include <fcntl.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "bignum.h"
+#include "fibdrv.h"
+
 #include "utime.h"
 
 #define FIB_DEV "/dev/fibonacci"
 #define OPTION_CHECK "check"
 #define OPTION_BECHMARK "benchmark"
-#define FIB_MAX_NUM 101
+#define FIB_MAX_NUM (MAX_LENGTH + 1)
 #define BENCHMARK_FILE "result.dat"
 
 void check(const int fd)
 {
     int offset = 100;
     long long sz;
-    BigNum num;
+    f_uint num;
 
     for (int i = 0; i <= offset; i++) {
         lseek(fd, i, SEEK_SET);
@@ -31,7 +33,11 @@ void check(const int fd)
         printf("Reading from " FIB_DEV
                " at offset %d, returned the sequence "
                "0x%llx%016llx.\n",
-               i, num.upper, num.lower);
+               i,
+               (sizeof(num) > 8)
+                   ? (unsigned long long) ((num >> 64) & ~((uint64_t) 0))
+                   : 0,
+               (unsigned long long) (num & ~((uint64_t) 0)));
     }
     for (int i = offset; i >= 0; i--) {
         lseek(fd, i, SEEK_SET);
@@ -43,7 +49,11 @@ void check(const int fd)
         printf("Reading from " FIB_DEV
                " at offset %d, returned the sequence "
                "0x%llx%016llx.\n",
-               i, num.upper, num.lower);
+               i,
+               (sizeof(num) > 8)
+                   ? (unsigned long long) ((num >> 64) & ~((uint64_t) 0))
+                   : 0,
+               (unsigned long long) (num & ~((uint64_t) 0)));
     }
 }
 
@@ -72,7 +82,7 @@ static void read_proxy(const int fd,
                        BenchmarkResult *result)
 {
     struct timespec prev_t, cur_t;
-    BigNum num;
+    f_uint num;
     size_t sz;
 
     lseek(fd, offset, SEEK_SET);
